@@ -30,20 +30,28 @@ void Mapping::MeasureObs() {
 }
 
 
-/* DESCRIPTION This function returns landmark bearings and ranges, both from the camera coordinates and dead reckoning
- * INPUTS:  rnCN - 
- *		    RnCN -
- *		    rnBN -
- *		    RnBN -
- *		    LC   -
- *		    cam  -
- *		    lmrks-
- * OUTPUTS: y    -
- *			yhat -
+/* DESCRIPTION: This function returns landmark bearings and ranges, both from the camera coordinates and dead reckoning
+ * INPUTS:  rnCN - 3x4         (NED by number of cameras)
+ *	        RnCN - 3x12        (3x3 rotation matrices comcatenated together)
+ *	        rnBN - 3x1         (NED position of boat in world coordinates)
+ *	        RnBn - 3x3         (Rotation of the boat)
+ *	        LC   - 4xObsL      (x,y,z,theta(radius of bouy) from camera)
+ *	        cam  - 1xObsL      (This camera observed this measurement)
+ *	        lmrks- 3x8         (STATIC NED GPS coordinates for landmarks)
+ * OUTPUTS: y    - 1x(2*ObsL)  (rangey,bearingy)
+ *	        yhat - 1x(2*ObsL)  (rangeyhat,bearingyhat)
  */
-void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
-
+void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks) {
+ 	
+	VectorXd y(4);
+	VectorXd yhat(4);
+	y << 1, 2, 3, 4;
+	yhat << 5, 6, 7, 8;
+	
+	
+	
 	/*
+ 	
 	MatrixXd LC(1,1); // Initialisation value of LC to detect when there are no landmark observations
 	
 	VectorXd bearingy,
@@ -97,8 +105,8 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 		y << 0;
 		yhat << 0;
 
-	}
-	*/
+
+	}*/
 }
 
 MatrixXd Mapping::GetGrid(bool flag) {

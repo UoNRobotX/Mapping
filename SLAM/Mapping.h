@@ -9,12 +9,10 @@ public:
 	Mapping(Map<MatrixXd> currentgrid, double* params);
 	void Nav(Vector3d pose, MatrixXd obinfo, MatrixXd landinfo, Sensor senObject);
 	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, MatrixXd cells); 
-	void MeasureObs(); 
-	void MeasureLand();
-	
+	void MeasureObs(); 	
 	VectorXd SubToInd(MatrixXd cells);	// Convert to Linear Index
 	MatrixXd IndToSub(VectorXd scan);	// Convert to XY Grid Co-od
-
+	void MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks);
 	MatrixXd GetGrid(bool flag);
 //	VectorXd GetSparseVect(bool flag); //Replace GetObsVect and GetLandVect
 //	VectorXd GetObsVect();

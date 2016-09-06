@@ -12,7 +12,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 	MatrixXd grid, gridy;
 	Map<MatrixXd> gridcurrent(mxGetPr(prhs[0]), mxGetM(prhs[0]), mxGetN(prhs[0]));
-	Mapping MapObject(gridcurrent, mxGetPr(prhs[1]));
+	Mapping MapObject(gridcurrent, mxGetPr(prhs[1])); // Constructor
 
 	/*Obtain All Other Variables from Matlab Utilsing Sensor Information*/ // Add Robustness with Sensor Class
 
@@ -23,6 +23,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	Map<MatrixXd> cells(mxGetPr(prhs[6]), mxGetM(prhs[5]), mxGetN(prhs[5]));
 
 	/*Call C++ Functions*/
+	MapObject.MeasureLand(rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks);
 
 //	MapObject.Nav(pose, obinfo, landinfo, senObject);
 

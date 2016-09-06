@@ -10,11 +10,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 	MatrixXd outgrid;
 	Map<MatrixXd> gridcurrent(mxGetPr(prhs[0]), mxGetM(prhs[0]), mxGetN(prhs[0]));
-	Mapping MapObject(gridcurrent, mxGetPr(prhs[1]));
+	Mapping MapObject(gridcurrent, mxGetPr(prhs[1])); // Constructor
 
 	/*Obtain All Other Variables from Matlab*/
 
 	/*Call C++ Functions*/
+	MapObject.MeasureLand(rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks);
 
 	/*Outputs*/
 

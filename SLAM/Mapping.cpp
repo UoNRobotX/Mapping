@@ -35,7 +35,17 @@ void Mapping::MeasureObs() {
  * OUTPUTS: y    -
  *			yhat -
  */
-void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
+void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix33d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks) {
+ 	/*
+ 	rnCN - 3x4         (NED by number of cameras)
+ 	RnCN - 3x12        (3x3 rotation matrices comcatenated together)
+ 	rnBN - 3x1         (NED position of boat in world coordinates)
+ 	RnBn - 3x3         (Rotation of the boat)
+ 	LC   - 4xObsL      (x,y,z,theta(radius of bouy) from camera)
+ 	cam  - 1xObsL      (This camera observed this measurement)
+ 	lmrks- 3x8         (STATIC NED GPS coordinates for landmarks)
+	y    - 1x(2*ObsL)  (rangey,bearingy)
+	yhat - 1x(2*ObsL)  (rangeyhat,bearingyhat)
 
 	MatrixXd LC(1,1); // Initialisation value of LC to detect when there are no landmark observations
 	
@@ -45,7 +55,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 			 rangeyhat;
 	/*********************************************************************************************************************/
 	/* Camera Observation */
-
+	/*
 	if (LC.rows() > 1) {  // This condition assumes that LC will be initialised to a 1x1 matrix if there is no landmarks
 		MatrixXd rcLC = LC.topRows(3);
 		VectorXd thLC = LC.bottomRows(1);
@@ -68,7 +78,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 
 	/**********************************************************************************************************************/
 	/* GPS and IMP Approximation with Assumed GPS Landmark Location */
-
+	/*
 	if (lmrks.rows() > 1) {  // This condition assumes that lmrks will be initialised to a 1x1 matrix if there is no landmarks
 		MatrixXd local = RnBN*(lmrks - rnBN.replicate(1, lmrks.rows()));
 		bearingyhat = atan2(local.row(1), local.row(0));  // unsure how atan2 is going to handle this
@@ -77,7 +87,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 
 	/**********************************************************************************************************************/
 	/* Form Outputs */
-
+	/*
 	if (lmrks.rows() > 1) {
 		VectorXd y(rangey.rows(),rangey.cols()+bearingy.cols());
 		VectorXd yhat(rangeyhat.rows(),rangeyhat.cols()+bearingyhat.cols());
@@ -90,7 +100,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 		y << 0;
 		yhat << 0;
 
-	}
+	}*/
 }
 
 MatrixXd Mapping::GetGrid() {

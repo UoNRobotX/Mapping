@@ -12,16 +12,19 @@ Mapping::Mapping(Map<MatrixXd> currentgrid, double* params)
 	thres = params[5];
 }
 
-void Mapping::Nav() {
-	
+void Mapping::Nav(Vector3d pose, MatrixXd obinfo, MatrixXd landinfo, Sensor senObject) {
 
-	  rad, scan, cells, map
+
 }
-void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC, MatrixXd cells, RowVectorXd cam, VectorXd radii, int numObstacles) {
-	//MatrixXd rnCN(3, 4), MatrixXd RnCN(3, 12), MatrixXd QC(4, 255), VectorXd ocam(255), VectorXd radii(255)
-	// Decided on 255 -> Large Number to hopefully contain all obstacles seen in timestep. (Can be larger, or make dynamic)
-	// Have int index telling us how big this matrices are for current timestep (from length of camera data) (nuObstacles)
+
+
+void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, MatrixXd cells) {
+	MatrixXd rcQC(3, obinfo.cols());
+	rcQC = obinfo.topRows(2);
+//	obstacles = rcQC.colwise().sum();
 }
+
+
 void Mapping::MeasureObs() {
 	//Takes in all
 }
@@ -104,6 +107,7 @@ MatrixXd Mapping::GetGrid(bool flag) {
 	return output;
 }
 
+/*
 VectorXd Mapping::GetObsVect() {
 	return y;
 }
@@ -111,3 +115,24 @@ VectorXd Mapping::GetObsVect() {
 VectorXd Mapping::GetLandVect() {
 	return yhat;
 }
+*/
+
+
+VectorXd Mapping::SubToInd(MatrixXd cells) {
+	VectorXd v(2);
+	return v;
+	// Convert to Linear Index
+}
+MatrixXd Mapping::IndToSub(VectorXd scan) {
+	// Convert to XY Grid Co-od
+	MatrixXd v(2,2);
+	return v;
+}
+
+/*
+
+VectorXd Mapping::GetSparseVect(bool flag) {
+	//Replace Get""Vect
+}
+
+*/

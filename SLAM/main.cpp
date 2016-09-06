@@ -6,23 +6,27 @@ using namespace Eigen;
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+
+
 	/*Initialise Mapping Class Parameters*/
 
 	MatrixXd grid, gridy;
 	Map<MatrixXd> gridcurrent(mxGetPr(prhs[0]), mxGetM(prhs[0]), mxGetN(prhs[0]));
 	Mapping MapObject(gridcurrent, mxGetPr(prhs[1]));
 
-	/*Obtain All Other Variables from Matlab*/
+	/*Obtain All Other Variables from Matlab Utilsing Sensor Information*/ // Add Robustness with Sensor Class
 
-	Map<MatrixXd> rnCN(mxGetPr(prhs[2]), 3, 4);
-	Map<MatrixXd> RnCN(mxGetPr(prhs[3]), 3, 12);
-	Map<MatrixXd> QC(mxGetPr(prhs[4]), mxGetM(prhs[4]), mxGetN(prhs[4]));
-	Map<MatrixXd> cells(mxGetPr(prhs[5]), mxGetM(prhs[4]), mxGetN(prhs[5]));
-	Map<RowVectorXd> cam(mxGetPr(prhs[6]), mxGetN(prhs[6]));
-	//Map<RowVectorXd> scan(mxGetPr(prhs[7]), mxGetN(prhs[7])); DONT NEED THIS!
+	Sensor SenObject(mxGetPr(prhs[2]));
+	Map<MatrixXd> rnCN(mxGetPr(prhs[3]), 3, SenObject.GetCameras());
+	Map<MatrixXd> RnCN(mxGetPr(prhs[4]), 3, SenObject.GetCameras()*3);
+	Map<MatrixXd> obinf(mxGetPr(prhs[5]), mxGetM(prhs[4]), SenObject.GetMax());
+	Map<MatrixXd> cells(mxGetPr(prhs[6]), mxGetM(prhs[5]), mxGetN(prhs[5]));
 
 	/*Call C++ Functions*/
 
+//	MapObject.Nav(pose, obinfo, landinfo, senObject);
+
+	MapObject.Grid(rnCN, RnCN, obinf, cells);
 
 
 	/*Outputs for Grid Function*/

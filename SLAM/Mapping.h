@@ -1,5 +1,5 @@
 #pragma once
-#include <Eigen/Dense>
+#include "Sensor.h"
 
 using namespace Eigen;
 
@@ -7,14 +7,18 @@ class Mapping
 {
 public:
 	Mapping(Map<MatrixXd> currentgrid, double* params);
-
-	void Nav();
-	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC,RowVectorXd cam, RowVectorXd radii, RowVectorXd );
+	void Nav(Vector3d pose, MatrixXd obinfo, MatrixXd landinfo, Sensor senObject);
+	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, MatrixXd cells); 
 	void MeasureObs(); 
 	void MeasureLand();
+	
+	VectorXd SubToInd(MatrixXd cells);	// Convert to Linear Index
+	MatrixXd IndToSub(VectorXd scan);	// Convert to XY Grid Co-od
+
 	MatrixXd GetGrid(bool flag);
-	VectorXd GetObsVect();
-	VectorXd GetLandVect();
+//	VectorXd GetSparseVect(bool flag); //Replace GetObsVect and GetLandVect
+//	VectorXd GetObsVect();
+//	VectorXd GetLandVect();
 
 private:
 	double dec;
@@ -23,8 +27,8 @@ private:
 	double min;
 	double res;
 	double thres;
-	//double width;
-	//double length;
+	double width; //Not initialised Yet
+	double length; //Not initialised Yet
 	MatrixXd grid;
 	MatrixXd gridy;
 	VectorXd y;

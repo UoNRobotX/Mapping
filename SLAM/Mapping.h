@@ -10,8 +10,8 @@ public:
 
 	void Nav();
 	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC,RowVectorXd cam, RowVectorXd radii, RowVectorXd );
-	void MeasureObs(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks); 
-	void MeasureLand();
+	void MeasureObs(); 
+	void MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks);
 	MatrixXd GetGrid(bool flag);
 	VectorXd GetObsVect();
 	VectorXd GetLandVect();

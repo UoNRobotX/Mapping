@@ -9,10 +9,10 @@ public:
 	Mapping(Map<MatrixXd> currentgrid, double* params);
 
 	void Nav();
-	//void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC,RowVectorXd ocam, RowVectorXd radii, RowVectorXd );
+	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC,RowVectorXd cam, RowVectorXd radii, RowVectorXd );
 	void MeasureObs(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, VectorXd cam, MatrixXd lmrks); 
 	void MeasureLand();
-	MatrixXd GetGrid();
+	MatrixXd GetGrid(bool flag);
 	VectorXd GetObsVect();
 	VectorXd GetLandVect();
 
@@ -26,6 +26,7 @@ private:
 	//double width;
 	//double length;
 	MatrixXd grid;
+	MatrixXd gridy;
 	VectorXd y;
 	VectorXd yhat;
 };

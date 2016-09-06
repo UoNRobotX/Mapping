@@ -3,6 +3,7 @@
 Mapping::Mapping(Map<MatrixXd> currentgrid, double* params)
 {
 	grid = currentgrid;
+	gridy = MatrixXd::Zero(grid.rows(), grid.cols());
 	dec = params[0];
 	inc = params[1];
 	max = params[2];
@@ -13,12 +14,14 @@ Mapping::Mapping(Map<MatrixXd> currentgrid, double* params)
 
 void Mapping::Nav() {
 	
+
+	  rad, scan, cells, map
 }
-/*void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC, VectorXd ocam, VectorXd radii, int numObstacles) {
+void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd QC, MatrixXd cells, RowVectorXd cam, VectorXd radii, int numObstacles) {
 	//MatrixXd rnCN(3, 4), MatrixXd RnCN(3, 12), MatrixXd QC(4, 255), VectorXd ocam(255), VectorXd radii(255)
 	// Decided on 255 -> Large Number to hopefully contain all obstacles seen in timestep. (Can be larger, or make dynamic)
 	// Have int index telling us how big this matrices are for current timestep (from length of camera data) (nuObstacles)
-}*/
+}
 void Mapping::MeasureObs() {
 	//Takes in all
 }
@@ -47,6 +50,7 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix33d
 	y    - 1x(2*ObsL)  (rangey,bearingy)
 	yhat - 1x(2*ObsL)  (rangeyhat,bearingyhat)
 
+	/*
 	MatrixXd LC(1,1); // Initialisation value of LC to detect when there are no landmark observations
 	
 	VectorXd bearingy,
@@ -100,11 +104,14 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix33d
 		y << 0;
 		yhat << 0;
 
+
 	}*/
 }
 
-MatrixXd Mapping::GetGrid() {
-	return grid;
+MatrixXd Mapping::GetGrid(bool flag) {
+	MatrixXd output;
+	output = (flag) ? gridy : grid;
+	return output;
 }
 
 VectorXd Mapping::GetObsVect() {

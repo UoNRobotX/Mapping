@@ -35,10 +35,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 	VectorXd bearingy,
 			 bearingyhat,
 			 rangey,
-			 rangeyhat,
-			 y,
-			 yhat;
-
+			 rangeyhat;
 	/*********************************************************************************************************************/
 	/* Camera Observation */
 
@@ -49,7 +46,7 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 		MatrixXd temp(3, 1);
 		temp << 2, 1, 0;
 		MatrixXd ind = 3 * cam.replicate(3, 1) - temp.replicate(1, lnd);
-	//	MatrixXd temp2 = -lmrks.row(3) ./ thLC.sin();					// the ./ operator does not work
+		MatrixXd temp2 = -lmrks.row(3).cwiseQuotent(thLC.sin());					
 		MatrixXd rcPC(3, lnd);
 		rcPC = temp2.replicate(3, 1)*rcLC;
 		MatrixXd rnPC = MatrixXd::Zero(3, lnd);
@@ -58,8 +55,8 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 		}
 		VectorXd rnPN = rnPC + rnCN.col(cam);	// careful! does cam need to have a -1?? //Is it a vector, or must it be a matrix??
 		MatrixXd diff = rnPN - rnBN.replicate(1, lnd);
-	//	bearingy = atan2(diff.row(1), diff.row(0));  // atan2 doesn't look like it can handle arrays for inputs
-	//	rangey = sqrt(sum(diff.^ 2));      // the .^ operator does not work AND the Sum doesn't look right
+		bearingy = atan2(diff.row(1), diff.row(0));    // unsure how atan2 is going to handle this
+		rangey = diff.square().sum().sqrt();
 	}
 
 	/**********************************************************************************************************************/
@@ -67,24 +64,25 @@ void Mapping::MeasureLand(/*rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks*/) {
 
 	if (lmrks.rows() > 1) {  // This condition assumes that lmrks will be initialised to a 1x1 matrix if there is no landmarks
 		MatrixXd local = RnBN*(lmrks - rnBN.replicate(1, lmrks.rows()));
-	//	bearingyhat = atan2(local.row(1), local.row(0));  // atan2 doesn't look like it can handle arrays for inputs
-	//	rangeyhat = sqrt(sum(local.^ 2));     // the .^ operator does not work AND the Sum doesn't look right
+		bearingyhat = atan2(local.row(1), local.row(0));  // unsure how atan2 is going to handle this
+		rangeyhat = local.square().sum().sqrt();     
 	}
 
 	/**********************************************************************************************************************/
 	/* Form Outputs */
 
 	if (lmrks.rows() > 1) {
-		y.middleCols(0, rangey.rows()) = rangey; // I haven't been able to figure out how to concatenate 2 arrays...
-		y.middleCols(rangey.rows(), bearingy.rows()) = bearingy; // ... so this is my bandade solution
-		yhat.middleCols(0,rangeyhat.rows()) = rangeyhat; // Same thing here...
-		yhat.middleCols(rangeyhat.rows(), bearingyhat.rows()) = bearingyhat; //... to here
+		VectorXd y(rangey.rows(),rangey.cols()+bearingy.cols());
+		VectorXd yhat(rangeyhat.rows(),rangeyhat.cols()+bearingyhat.cols());
+		y << rangey,bearingy;
+		yhat << rangeyhat,bearingyhat;
 	}
 	else { // Using a 1 element array with a zero in it to indicate there was no observations
-		VectorXd emptyVect(1); 
-		emptyVect << 0;
-		y = emptyVect;
-		yhat = emptyVect;
+		VectorXd y(1,1);
+		VectorXd yhat(1,1);
+		y << 0;
+		yhat << 0;
+
 	}
 }
 

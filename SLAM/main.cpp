@@ -1,28 +1,28 @@
 #include <iostream>
 #include <mex.h>
-#include <Eigen/Dense>
+#include "Mapping.h"
 
-void placeElement(double *el, double *er, int x);
+using namespace Eigen;
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-	double *el, *er;
-	int element;
-	size_t rows, cols;
+	/*Initialise Mapping Class Parameters*/
 
-	rows = mxGetM(prhs[0]);
-	cols = mxGetN(prhs[0]);
-	element = (int)*mxGetPr(prhs[1]);
+	MatrixXd outgrid;
+	Map<MatrixXd> gridcurrent(mxGetPr(prhs[0]), mxGetM(prhs[0]), mxGetN(prhs[0]));
+	Mapping MapObject(gridcurrent, mxGetPr(prhs[1]));
+
+	/*Obtain All Other Variables from Matlab*/
+
+	/*Call C++ Functions*/
+
+	/*Outputs*/
+
+	outgrid = MapObject.GetGrid();
+	plhs[0] = mxCreateDoubleMatrix((mwSize)outgrid.rows(), (mwSize)outgrid.cols(), mxREAL);
+	Map<MatrixXd>(mxGetPr(plhs[0]), outgrid.rows(), outgrid.cols()) = outgrid;
 	
-	plhs[0] = mxCreateDoubleMatrix((mwSize)rows, (mwSize)cols, mxREAL);
-	plhs[1] = mxCreateDoubleScalar(element);
 
-	el = mxGetPr(plhs[0]);
-	er = mxGetPr(prhs[0]);
 	
-	placeElement(el, er, element);	
-}
-
-void placeElement(double *el, double *er, int x) {
-	el[0] = er[x];
+	
 }

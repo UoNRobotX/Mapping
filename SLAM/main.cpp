@@ -23,7 +23,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	Map<MatrixXd> cells(mxGetPr(prhs[6]), mxGetM(prhs[5]), mxGetN(prhs[5]));
 
 	/*Call C++ Functions*/
-	MapObject.MeasureLand(rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks);
+	//MapObject.MeasureLand(rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks);
 
 //	MapObject.Nav(pose, obinfo, landinfo, senObject);
 

@@ -2,14 +2,9 @@
 
 Sensor::Sensor(double* params){
 	cameras = (int)params[0];
-	maxobserve = (int)params[1];
-	height = params[2];
+	height = params[1];
 }
 
 int Sensor::GetCameras() {
 	return cameras;
-}
-
-int Sensor::GetMax() {
-	return maxobserve;
 }

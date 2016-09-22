@@ -103,20 +103,15 @@ void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, VectorXi camer
  * INPUTS:  rnCN - 3x4         (NED by number of cameras)
  *	        RnCN - 3x12        (3x3 rotation matrices concatenated together)
  *	        rnBN - 3x1         (NED position of boat in world coordinates)
- *	        RnBn - 3x3         (Rotation of the boat)
- *	        LC   - 4xObsL      (x,y,z,theta(radius of bouy) from camera)
+ *	        RnBN - 3x3         (Rotation of the boat)
+ *	        LC   - 4xObsL      (x,y,z,theta(radius of landmark) from camera)
  *	        cam  - 1xObsL      (This camera observed this measurement)
- *	        lmrks- 4x8         (STATIC NED GPS coordinates for landmarks and a standard height for every landmark)
+ *	        lmrks- 4xObsL      (STATIC NED GPS coordinates for landmarks and a standard height for every landmark)
  * OUTPUTS: y    - 1x(2*ObsL)  (rangey,bearingy)
  *	        yhat - 1x(2*ObsL)  (rangeyhat,bearingyhat)
  */
-void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd cam, MatrixXd lmrks) {
+void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd camL, MatrixXd lmrks) {
 
-
-	
-	
-	
-	
 	
 	/*********************************************************************************************************************/
 	/* Camera Observation */
@@ -131,7 +126,7 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 				 rangeyhat(lnd);
 		MatrixXd temp(3, 1);
 		temp << 2, 1, 0;
-		MatrixXd ind = 3 * cam.replicate(3, 1) - temp.replicate(1, lnd);
+		MatrixXd ind = 3 * camL.replicate(3, 1) - temp.replicate(1, lnd);
 		MatrixXd temp3 = thLC.array().sin();
 		MatrixXd temp2 = lmrks.row(3).array().cwiseQuotient(temp3.array());
 		MatrixXd rcPC(3, lnd);
@@ -140,7 +135,7 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 		MatrixXd rnPN(3, lnd);
 		
 		for (int count = 0; count < lnd; count++) {
-			rnPN.col(count) = RnCN.middleCols((cam(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(cam(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
+			rnPN.col(count) = RnCN.middleCols((camL(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(camL(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
 		}
 		
 		

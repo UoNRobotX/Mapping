@@ -6,36 +6,38 @@ using namespace Eigen;
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-	/**********************************************************************************
-	* The Main Function() formats Matlab Parameters and Executes C++ Code.            *
-	***********************************************************************************/
+	/*Obtain Data from Matlab*/
 
-	Map<MatrixXd> gridhist(mxGetPr(prhs[0]), mxGetM(prhs[0]), mxGetN(prhs[0]));
-	Mapping MapObject((MatrixXd)gridhist, mxGetPr(prhs[1]));
+	Map<VectorXd> pose(mxGetPr(prhs[0]), mxGetM(prhs[0]));
+	Map<VectorXd> obscam(mxGetPr(prhs[1]), mxGetM(prhs[1]));
+	Map<VectorXd> lndcam(mxGetPr(prhs[2]), mxGetM(prhs[2]));
+	Map<MatrixXd> obsinfo(mxGetPr(prhs[3]), mxGetM(prhs[3]), mxGetN(prhs[3]));
+	Map<MatrixXd> lndinfo(mxGetPr(prhs[4]), mxGetM(prhs[4]), mxGetN(prhs[4]));
+	Map<MatrixXd> gridhist(mxGetPr(prhs[5]), mxGetM(prhs[5]), mxGetN(prhs[5]));
+	Map<MatrixXd> rbCB(mxGetPr(prhs[6]), mxGetM(prhs[6]), mxGetN(prhs[6]));
+	Map<MatrixXd> RbCB(mxGetPr(prhs[7]), mxGetM(prhs[7]), mxGetN(prhs[7]));
+	
+	/*Initalise Parameters in Classes Mapping and Sensor*/
 
-	Sensor SenObject(mxGetPr(prhs[2]));
-	Map<MatrixXd> data(mxGetPr(prhs[3]), mxGetM(prhs[3]), mxGetN(prhs[3]));
-	Map<VectorXd> camera(mxGetPr(prhs[4]), mxGetM(prhs[4]));
+	Mapping MapObject((MatrixXd)gridhist, mxGetPr(prhs[8]));
+	Sensor SenObject((MatrixXd)rbCB, (MatrixXd)RbCB, mxGetPr(prhs[9]));
 
-	// Will Not Need when Nav Complete!!
+	/*Call C++ Function to Update Required Information*/
 
-	Map<MatrixXd> rnCN(mxGetPr(prhs[5]), 3, SenObject.GetCameras());
-	Map<MatrixXd> RnCN(mxGetPr(prhs[6]), 3, SenObject.GetCameras() * 3);
-	Map<MatrixXd> cells(mxGetPr(prhs[7]), mxGetM(prhs[7]), mxGetN(prhs[7]));
+	MapObject.Update((VectorXd)pose, (VectorXi)obscam.cast<int>(), (VectorXi)lndcam.cast<int>(), (MatrixXd)obsinfo, (MatrixXd)lndinfo, SenObject);
 
-	/*Call C++ Functions*/
-
-	//MapObject.Nav(pose, obinfo, landinfo, senObject);
-	MapObject.Grid((MatrixXd)rnCN, (MatrixXd)RnCN, (MatrixXd)data, (VectorXi)camera.cast<int>(), (MatrixXi)cells.cast<int>());
-	MapObject.MeasureLand(rnCN,RnCN,rnBN,RnBN,LC,cam,lmrks);
-
-	/*Outputs Requested by Matlab*/
+	/*Request Outputs for Matlab*/
 
 	MatrixXd grid = MapObject.GetGrid(0);
-	plhs[0] = mxCreateDoubleMatrix((mwSize)grid.rows(), (mwSize)grid.cols(), mxREAL);
-	Map<MatrixXd>(mxGetPr(plhs[0]), grid.rows(), grid.cols()) = grid;
+	//VectorXd y = MapObject.GetVect(0);
+	//VectorXd yhat = MapObject.GetVect(1);
 
-	MatrixXd gridy = MapObject.GetGrid(1);
-	plhs[1] = mxCreateDoubleMatrix((mwSize)gridy.rows(), (mwSize)gridy.cols(), mxREAL);
-	Map<MatrixXd>(mxGetPr(plhs[0]), gridy.rows(), gridy.cols()) = gridy;
+	/*Send Outputs to Matlab*/
+
+	plhs[0] = mxCreateDoubleMatrix((mwSize)grid.rows(), (mwSize)grid.cols(), mxREAL);
+	//plhs[1] = mxCreateDoubleMatrix((mwSize)y.rows(), (mwSize)y.cols(), mxREAL);
+	//plhs[2] = mxCreateDoubleMatrix((mwSize)yhat.rows(), (mwSize)yhat.cols(), mxREAL);
+	Map<MatrixXd>(mxGetPr(plhs[0]), grid.rows(), grid.cols()) = grid;
+	//Map<VectorXd>(mxGetPr(plhs[1]), y.rows()) = y;
+	//Map<VectorXd>(mxGetPr(plhs[2]), yhat.rows()) = yhat;
 }

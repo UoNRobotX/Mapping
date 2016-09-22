@@ -6,13 +6,15 @@ using namespace Eigen;
 class Sensor
 {
 public:
-	Sensor(double* params);
-	int GetCameras();
+	Sensor(MatrixXd vects, MatrixXd rotations, double* params);
+	double GetRange();
+	double GetHeight();	
+	MatrixXd GetVects();
+	MatrixXd GetRotations();
 private:
-	int cameras;
+	double range;
 	double height;
 	MatrixXd rbCB;
 	MatrixXd RbCB;
-	// Add in Sensor Covariances Etc!!
 };
 

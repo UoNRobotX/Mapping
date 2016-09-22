@@ -7,14 +7,14 @@ class Mapping
 {
 public:
 	Mapping(MatrixXd currentgrid, double* params);
-	void Nav(Vector3d pose, MatrixXd obinfo, MatrixXd landinfo, Sensor senObject);
-	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, VectorXi camera, MatrixXi cells);
+	void Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd obsinfo, MatrixXd lndinfo, Sensor senObject);
+	void Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obsinfo, VectorXi obscam, MatrixXi cells);
+	RowVectorXi LogicalIndex(RowVectorXd uelem, RowVectorXd lelem, const double upper, const double lower);
+	MatrixXd GetGrid(bool flag);
+	VectorXd GetVect(bool flag);
+		
 	void MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd cam, MatrixXd lmrks);
 	//void MeasureObs();
-	RowVectorXi IsMember(RowVectorXi set, RowVectorXi subset);
-	RowVectorXi LogicalIndex(RowVectorXd elem, const double cond, bool flag);
-	MatrixXd GetGrid(bool flag);
-	VectorXd GetObsVect(bool flag);
 
 private:
 	double res;

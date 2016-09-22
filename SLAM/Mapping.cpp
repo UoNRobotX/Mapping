@@ -1,134 +1,220 @@
 #include "Mapping.h"
 
-Mapping::Mapping(MatrixXd currentgrid, double* params)
-{
-	/**************************************************************************
-	* The Constructor() initialises all parameters specified below for the    *
-	* Mapping Class   (CHANGE TO YMAL FILE?)                                  *
-	***************************************************************************/
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
 
-	res = params[0]; dec = params[1];	
+Mapping::Mapping(MatrixXd currentgrid, double* params) {
+
+	res = params[0]; dec = params[1];
 	inc = params[2]; thres = params[3];
 	maxval = params[4]; minval = params[5];
 	grid = currentgrid; gridy = MatrixXd::Zero(grid.rows(), grid.cols());
 }
 
-void Mapping::Nav(Vector3d pose, MatrixXd obinfo, MatrixXd landinfo, Sensor senObject) {
-	// To DO!
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd obsinfo, MatrixXd lndinfo, Sensor senObject) {
+
+	/*Memory Allocation*/
+	
+	Matrix3d RnBN;
+	Vector3d rnBN;
+	MatrixXi cells;
+	RowVectorXi index;
+	RowVectorXd magnitude, nrth, east, constant;
+	Vector2d gridpose, minlim, maxlim;
+	MatrixXd rnCN, RnCN, subscripts;
+	size_t nrthlen, eastlen;
+	
+	/*Parameter Initialisation*/
+	double range = senObject.GetRange() / res;
+	double roll = pose(3); double pitch = pose(4); double yaw = pose(5);
+	Vector2d maxsub((const double)(grid.rows()-1), (const double)(grid.cols()-1));
+	Vector2d minsub = Vector2d::Zero();
+
+	/*Global Camera Positions and Rotations*/
+	rnBN << pose(0), pose(1), cos(pitch)*cos(roll)*senObject.GetHeight();
+	RnBN << cos(yaw)*cos(pitch), -sin(yaw)*cos(roll) + cos(yaw)*sin(pitch)*sin(roll), sin(yaw)*sin(roll) + cos(yaw)*cos(roll)*sin(pitch),
+		sin(yaw)*cos(pitch), cos(yaw)*cos(roll) + sin(roll)*sin(pitch)*sin(yaw), -cos(yaw)*sin(roll) + sin(yaw)*cos(roll)*sin(pitch),
+		-sin(pitch), cos(pitch)*sin(roll), cos(pitch)*cos(roll);
+	rnCN = (RnBN*senObject.GetVects()).colwise() + rnBN;
+	RnCN = RnBN*senObject.GetRotations();
+
+	/*North and East Bounds*/	
+	gridpose = pose.topRows(2).array() / res;
+	minlim = (gridpose.array() - range).max(minsub.array());
+	maxlim = (gridpose.array() + range).min(maxsub.array());
+	for (int count = 0; count < minlim.rows(); count++) {
+		minlim(count) = std::round(minlim(count));
+		maxlim(count) = std::round(maxlim(count));
+	}
+	nrthlen = (size_t)(maxlim(0) - minlim(0) + 1);
+	eastlen = (size_t)(maxlim(1) - minlim(1) + 1);
+	nrth = RowVectorXd::LinSpaced(nrthlen, minlim(0), maxlim(0));
+	east = RowVectorXd::LinSpaced(eastlen, minlim(1), maxlim(1));
+
+	/*Field of View Subscripts*/
+	constant = RowVectorXd::Ones(nrthlen);
+	subscripts.resize(2, eastlen*nrthlen);
+	subscripts.row(0) = nrth.replicate(1,eastlen);
+	for (int count = 0; count < eastlen; count++) {
+		subscripts.block(1, nrthlen*count, 1, nrthlen) = constant*east(count);
+	}
+	magnitude = (subscripts.colwise() - gridpose).colwise().hypotNorm();
+	index = LogicalIndex(magnitude, magnitude, range, -1);
+	cells.resize(2, index.cols());
+	for(int count = 0; count < index.cols(); count++){
+		cells.col(count) = subscripts.col(index(count)).cast<int>();
+	}
+
+	/*Update Grid and Measurement Vectors*/
+	Grid(rnCN, RnCN, obsinfo, obscam, cells);
 }
 
-void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obinfo, VectorXi camera, MatrixXi cells) {
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
 
-	/**************************************************************************
-	 * The Grid Function() updates a virtual grid which retains all history   *
-	 * of the environment, as well as gridy, which contains only the current  *
-	 * obstacle information from the cameras.                                 *
-	 **************************************************************************/
+void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obsinfo, VectorXi obscam, MatrixXi cells) {
 
+	/*Memory Allocation*/
 	size_t centres = cells.cols();
-	MatrixXd rcGC(3, centres), rnGN(3, centres);
-	MatrixXd rcQCmat(3, centres), rnPNmat(3, centres), rnCNmat(3, centres);
-	RowVectorXd magnitude(centres), weight(centres), dtprod(centres), thGC(centres);
-	Matrix3d trans;
+	RowVectorXi index, filter(centres);
+	RowVectorXd norms(centres), magnitude(centres);
+	RowVectorXd weight(centres), dtprod(centres), thGC(centres);
+	MatrixXd rcPC(3, centres), rcGC(3, centres); 
+	Matrix3d RnNC;
+	Vector3d rnPN;
 
 	/*Parameter Initialisation*/
-
-	size_t objects = obinfo.cols();
-	MatrixXd rcQC = obinfo.topRows(3);
-	RowVectorXd thQC = obinfo.row(3);
-	RowVectorXd radii = obinfo.row(4);
-
-	/*Derivation of Global Postions of Detected Obstacles*/
-
-	MatrixXd rnPN(3, objects);
-	RowVectorXd norms = radii.array() / sin(thQC.array());
-	MatrixXd rcPC = norms.replicate(3, 1).cwiseProduct(rcQC);
-	for (int count = 0; count < objects; count++) {
-		rnPN.col(count) = RnCN.middleCols((camera(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(camera(count) - 1);
-	}
-	rnPN.bottomRows(1) *= 0;
+	size_t objects = obsinfo.cols();
+	MatrixXd rcQC = obsinfo.topRows(3);
+	RowVectorXd thQC = obsinfo.row(3);
+	RowVectorXd radii = obsinfo.row(4);
+	RowVectorXd free = RowVectorXd::Zero(centres);
+	MatrixXd rnGN = MatrixXd::Zero(3, centres);
+	MatrixXd valid = MatrixXd::Ones(grid.rows(), grid.cols());
+	MatrixXd prevgrid = grid;
 
 	/*Updation of Grid*/
-
-	MatrixXd prevgrid = grid;
-	RowVectorXd free = RowVectorXd::Ones(centres);
-	rnGN.topLeftCorner(cells.rows(), cells.cols()) = cells.array().cast<double>() - 0.5;
+	norms = radii.array() / sin(thQC.array());
+	rcPC = norms.replicate(3, 1).cwiseProduct(rcQC);
+	rnGN.topLeftCorner(cells.rows(), cells.cols()) = (cells.array().cast<double>() + 0.5)*res;
 	for (int count = 0; count < objects; count++) {
-		rnPNmat = rnPN.col(count).replicate(1, centres);
-		rcQCmat = rcQC.col(count).replicate(1, centres);
-		rnCNmat = rnCN.col(camera(count) - 1).replicate(1, centres);
+		rnPN = RnCN.middleCols(obscam(count) * 3, 3)*rcPC.col(count) + rnCN.col(obscam(count));
+		rnPN(2) = 0;
 
 		/*Region of Occupancy*/
-
-		magnitude = (rnPNmat - rnGN).colwise().norm();
-		RowVectorXi index = LogicalIndex(magnitude, radii(count), 1);
+		magnitude = (rnGN.colwise() - rnPN).colwise().hypotNorm();
+		index = LogicalIndex(magnitude, magnitude, radii(count), -1);
 		if (index.cols() > 0) {
-			for (int loop = 0; loop < index.size(); loop++) {
+			for (int loop = 0; loop < index.cols(); loop++) {
 				grid(cells(0, index(loop)), cells(1, index(loop))) += inc;
-				free(index(loop)) = 0;
+				free(index(loop)) = 1;
 			}
 		}
-		/*Shadow Ellipsoid*/
 
-		trans = RnCN.middleCols((camera(count) - 1) * 3, 3).transpose();
-		rcGC = trans*(rnGN - rnCNmat);
-		magnitude = rcGC.colwise().norm();
-		weight = (rcQCmat.cwiseProduct(rcGC)).colwise().sum();
+		/*Shadow Ellipsoid*/
+		RnNC = RnCN.middleCols(obscam(count) * 3, 3).transpose();
+		rcGC = (RnNC)*(rnGN.colwise() - rnCN.col(obscam(count)));
+		magnitude = rcGC.colwise().hypotNorm();
+		weight = (rcGC.cwiseProduct(rcQC.col(count).replicate(1, centres))).colwise().sum();
 		dtprod = weight.cwiseQuotient(magnitude);
-		RowVectorXi indangles = LogicalIndex(acos(dtprod.array()), thQC(count), 0);
-		RowVectorXi inddtprod = LogicalIndex(dtprod, 0, 1);
-		index = IsMember(indangles, inddtprod);
+		index = LogicalIndex(acos(dtprod.array()), dtprod, thQC(count), 0);
 		if (index.cols() > 0) {
-			for (int loop = 0; loop < index.size(); loop++) {
-				free(index(loop)) = 0;
+			for (int loop = 0; loop < index.cols(); loop++) {
+				free(index(loop)) = 1;
 			}
 		}
 	}
-	/*Decrement FoV Free Cells and Limit Likelihood Ranges*/
 
-	RowVectorXi index = LogicalIndex(free, 1, 1);
+	/*Decrement Free Cells and Limit Likelihoods*/
+	gridy = grid - prevgrid;
+	index = LogicalIndex(free, free, 0, 0);
 	if (index.cols() > 0) {
-		for (int count = 0; count < index.size(); count++) {
+		for (int count = 0; count < index.cols(); count++) {
 			grid(cells(0, index(count)), cells(1, index(count))) -= dec;
 		}
 	}
-	MatrixXd ones = MatrixXd::Ones(grid.rows(), grid.cols());
-	gridy = grid - prevgrid;	
-	grid = grid.array().min(ones.array()*maxval);
-	grid = grid.array().max(ones.array()*minval);
+	grid = grid.array().min(valid.array()*maxval);
+	grid = grid.array().max(valid.array()*minval); 
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+RowVectorXi Mapping::LogicalIndex(RowVectorXd uelem, RowVectorXd lelem, const double upper, const double lower) {
+
+	RowVectorXi index;
+	RowVectorXi inv = RowVectorXi::Constant(uelem.cols(), -1);
+	RowVectorXi lin = RowVectorXi::LinSpaced(uelem.cols(), 0, (const int)(uelem.cols() - 1));
+	RowVectorXi filter = ((uelem.array() <= upper) && (lelem.array() >= lower)).select(lin, inv);
+	std::sort(filter.data(), filter.data() + filter.cols());
+	index = filter.rightCols((filter.array() > -1).count());
+	return index;
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+MatrixXd Mapping::GetGrid(bool flag) {
+
+	MatrixXd output;
+	output = (flag) ? gridy : grid;
+	return output;
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+VectorXd Mapping::GetVect(bool flag) {
+
+	VectorXd output;
+	output = (flag) ? yhat : y;
+	return output;
 }
 
 
-/* DESCRIPTION: This function returns landmark bearings and ranges, both from the camera coordinates and dead reckoning
- * INPUTS:  rnCN - 3x4         (NED by number of cameras)
- *	        RnCN - 3x12        (3x3 rotation matrices concatenated together)
- *	        rnBN - 3x1         (NED position of boat in world coordinates)
- *	        RnBn - 3x3         (Rotation of the boat)
- *	        LC   - 4xObsL      (x,y,z,theta(radius of bouy) from camera)
- *	        cam  - 1xObsL      (This camera observed this measurement)
- *	        lmrks- 4x8         (STATIC NED GPS coordinates for landmarks and a standard height for every landmark)
- * OUTPUTS: y    - 1x(2*ObsL)  (rangey,bearingy)
- *	        yhat - 1x(2*ObsL)  (rangeyhat,bearingyhat)
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
 void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd cam, MatrixXd lmrks) {
 
+	//NOTE:: Camera Index now 0,1,2,3!!! NOT 1,2,3,4!! FIX!!
 
-	
-	
-	
-	
-	
+
 	/*********************************************************************************************************************/
 	/* Camera Observation */
-	
+
 	if (LC.rows() > 1) {  // This condition assumes that LC will be initialised to a 1x1 matrix if there is no landmarks
 		MatrixXd rcLC = LC.topRows(3);
 		MatrixXd thLC = LC.bottomRows(1);
 		int lnd = rcLC.cols();
 		VectorXd bearingy(lnd),
-				 bearingyhat(lnd),
-				 rangey(lnd),
-				 rangeyhat(lnd);
+			bearingyhat(lnd),
+			rangey(lnd),
+			rangeyhat(lnd);
 		MatrixXd temp(3, 1);
 		temp << 2, 1, 0;
 		MatrixXd ind = 3 * cam.replicate(3, 1) - temp.replicate(1, lnd);
@@ -138,35 +224,35 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 		rcPC = temp2.replicate(3, 1).cwiseProduct(rcLC);
 		MatrixXd rnPC = MatrixXd::Zero(3, lnd);
 		MatrixXd rnPN(3, lnd);
-		
+
 		for (int count = 0; count < lnd; count++) {
 			rnPN.col(count) = RnCN.middleCols((cam(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(cam(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
 		}
-		
-		
+
+
 		MatrixXd diff = rnPN - rnBN.replicate(1, lnd);
 		for (int count = 0; count < lnd; count++) {
 			bearingy(count) = atan2(diff(1, count), diff(0, count));
 		}
 		rangey = diff.colwise().norm();
-		
+
 		/**********************************************************************************************************************/
 		/* GPS and IMP Approximation with Assumed GPS Landmark Location */
 
 		MatrixXd local = RnBN*(lmrks.topRows(3) - rnBN.replicate(1, lnd));
-		
+
 		for (int count = 0; count < lnd; count++) {
 			bearingy(count) = atan2(local(1, count), local(0, count));
 		}
 		rangeyhat = local.colwise().norm();
-		
-		
+
+
 		/**********************************************************************************************************************/
 		/* Form Outputs */
 		y.resize(lnd * 2);
 		yhat.resize(lnd * 2);
-		y << rangey,bearingy;
-		yhat << rangeyhat,bearingyhat;
+		y << rangey, bearingy;
+		yhat << rangeyhat, bearingyhat;
 	}
 	else { // Using a 1 element array with a zero in it to indicate there was no observations
 		y.resize(1);
@@ -174,60 +260,4 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 		y << 0;
 		yhat << 0;
 	}
-}
-
-RowVectorXi Mapping::IsMember(RowVectorXi set, RowVectorXi subset) {
-
-	/************************************************************************************
-	* The IsMember Function() returns all elements of Subset who also belong within Set *
-	*************************************************************************************/
-
-	RowVectorXi members, index;
-	if (set.size()*subset.size() > 0) {
-		members = RowVectorXi::Zero(subset.size());
-		for (int count = 0; count < subset.size(); count++) {
-			index = (set.array() == subset(count)).select(RowVectorXi::Ones(set.size()), RowVectorXi::Zero(set.size()));
-			members(count) = (index.prod()) ? subset(count) : 0;
-		}
-		std::sort(index.data(), index.data() + index.size());
-		RowVectorXi members = index.rightCols((index.array() > 0).count());
-	}
-	return members;
-}
-
-VectorXd Mapping::GetObsVect(bool flag) {
-	VectorXd output;
-	output = (flag) ? yhat : y;
-	return output;
-}
-
-RowVectorXi Mapping::LogicalIndex(RowVectorXd elem, const double cond, bool flag) {
-
-	/**********************************************************************************
-	* The LogicalIndex Function() places the index of all elements of a RowVectorXd	  *
-	* which satisfies a specific logical condition, into a RowVectorXd named index.   *
-	* Boolean Flag switches the equality sign.       								  *
-	***********************************************************************************/
-
-	RowVectorXi filter(elem.size());
-	RowVectorXi linear = RowVectorXi::LinSpaced(elem.size(), 1, (const int)elem.size());
-	if (flag) {
-		filter = (elem.array() >= cond).select(linear, RowVectorXi::Zero(elem.cols()));
-	} else {
-		filter = (elem.array() <= cond).select(linear, RowVectorXi::Zero(elem.cols()));
-	}
-	std::sort(filter.data(), filter.data() + filter.size());
-	RowVectorXi index = filter.rightCols((filter.array() > 0).count());
-	return index.array() - 1;
-}
-
-MatrixXd Mapping::GetGrid(bool flag) {
-
-	/**********************************************************************************
-	* The GetGrid Function() outputs a specified grid dependant upon flag value       *
-	***********************************************************************************/
-
-	MatrixXd output;
-	output = (flag) ? gridy : grid;
-	return output;
 }

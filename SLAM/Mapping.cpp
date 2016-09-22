@@ -199,10 +199,10 @@ VectorXd Mapping::GetVect(bool flag) {
 
 /*--------------------------------------------------------------------------------------------------------------------------------------*/
 
-void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd cam, MatrixXd lmrks) {
 
 	//NOTE:: Camera Index now 0,1,2,3!!! NOT 1,2,3,4!! FIX!!
 
+void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd camL, MatrixXd lmrks) {
 
 	/*********************************************************************************************************************/
 	/* Camera Observation */
@@ -217,7 +217,7 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 			rangeyhat(lnd);
 		MatrixXd temp(3, 1);
 		temp << 2, 1, 0;
-		MatrixXd ind = 3 * cam.replicate(3, 1) - temp.replicate(1, lnd);
+		MatrixXd ind = 3 * camL.replicate(3, 1) - temp.replicate(1, lnd);
 		MatrixXd temp3 = thLC.array().sin();
 		MatrixXd temp2 = lmrks.row(3).array().cwiseQuotient(temp3.array());
 		MatrixXd rcPC(3, lnd);
@@ -226,7 +226,7 @@ void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d 
 		MatrixXd rnPN(3, lnd);
 
 		for (int count = 0; count < lnd; count++) {
-			rnPN.col(count) = RnCN.middleCols((cam(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(cam(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
+			rnPN.col(count) = RnCN.middleCols((camL(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(camL(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
 		}
 
 

@@ -3,8 +3,7 @@
 
 using namespace Eigen;
 
-class Sensor
-{
+class Sensor{
 public:
 	Sensor(MatrixXd vects, MatrixXd rotations, double* params);
 	double GetRange();

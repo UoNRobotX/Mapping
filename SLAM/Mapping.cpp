@@ -2,8 +2,9 @@
 
 /*--------------------------------------------------------------------------------------------------------------------------------------*/
 
-Mapping::Mapping(MatrixXd currentgrid, double* params) {
+Mapping::Mapping(MatrixXd currentgrid, MatrixXd markers, double* params) {
 
+	landmarks = markers;
 	res = params[0]; dec = params[1];
 	inc = params[2]; thres = params[3];
 	maxval = params[4]; minval = params[5];
@@ -15,7 +16,6 @@ Mapping::Mapping(MatrixXd currentgrid, double* params) {
 void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd obsinfo, MatrixXd lndinfo, Sensor senObject) {
 
 	/*Memory Allocation*/
-	
 	Matrix3d RnBN;
 	Vector3d rnBN;
 	MatrixXi cells;
@@ -26,7 +26,7 @@ void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd o
 	size_t nrthlen, eastlen;
 	
 	/*Parameter Initialisation*/
-	double range = senObject.GetRange() / res;
+	double gridrange = senObject.GetRange() / res;
 	double roll = pose(3); double pitch = pose(4); double yaw = pose(5);
 	Vector2d maxsub((const double)(grid.rows()-1), (const double)(grid.cols()-1));
 	Vector2d minsub = Vector2d::Zero();
@@ -41,8 +41,8 @@ void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd o
 
 	/*North and East Bounds*/	
 	gridpose = pose.topRows(2).array() / res;
-	minlim = (gridpose.array() - range).max(minsub.array());
-	maxlim = (gridpose.array() + range).min(maxsub.array());
+	minlim = (gridpose.array() - gridrange).max(minsub.array());
+	maxlim = (gridpose.array() + gridrange).min(maxsub.array());
 	for (int count = 0; count < minlim.rows(); count++) {
 		minlim(count) = std::round(minlim(count));
 		maxlim(count) = std::round(maxlim(count));
@@ -60,7 +60,7 @@ void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd o
 		subscripts.block(1, nrthlen*count, 1, nrthlen) = constant*east(count);
 	}
 	magnitude = (subscripts.colwise() - gridpose).colwise().hypotNorm();
-	index = LogicalIndex(magnitude, magnitude, range, -1);
+	index = LogicalIndex(magnitude, magnitude, gridrange, -1);
 	cells.resize(2, index.cols());
 	for(int count = 0; count < index.cols(); count++){
 		cells.col(count) = subscripts.col(index(count)).cast<int>();
@@ -68,6 +68,8 @@ void Mapping::Update(VectorXd pose, VectorXi obscam, VectorXi lndcam, MatrixXd o
 
 	/*Update Grid and Measurement Vectors*/
 	Grid(rnCN, RnCN, obsinfo, obscam, cells);
+	ObstVects(rnBN.topRows(2),cells, senObject.GetRange());
+	LandVects(rnCN, RnCN, rnBN, RnBN, lndinfo, lndcam);
 }
 
 /*--------------------------------------------------------------------------------------------------------------------------------------*/
@@ -125,7 +127,7 @@ void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obsinfo, VectorXi obsc
 		}
 	}
 
-	/*Decrement Free Cells and Limit Likelihoods*/
+	/*Free Cells*/
 	gridy = grid - prevgrid;
 	index = LogicalIndex(free, free, 0, 0);
 	if (index.cols() > 0) {
@@ -135,6 +137,105 @@ void Mapping::Grid(MatrixXd rnCN, MatrixXd RnCN, MatrixXd obsinfo, VectorXi obsc
 	}
 	grid = grid.array().min(valid.array()*maxval);
 	grid = grid.array().max(valid.array()*minval); 
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+void Mapping::ObstVects(Vector2d rnBN, MatrixXi cells, double range) {
+	
+	/*Memory Allocation*/
+	size_t index, ang;
+	RowVectorXd magnitude, logic;
+	MatrixXd measure = MatrixXd::Constant(360, 2, range);	
+	MatrixXd threslim, occupied, vectors, current(grid.rows(), grid.cols());
+	double threshold, radian;
+	for (int count = 0; count < 2; count++) {
+
+		/*Occupied Cell Centroid Positions*/
+		index = 0;
+		threslim = MatrixXd::Constant(2, cells.cols(), -1);
+		current = (count) ? grid : gridy;
+		threshold = (count) ? thres : inc;	
+		for (int loop = 0; loop < cells.cols(); loop++) {
+			if (current(cells(0, loop), cells(1, loop)) >= threshold) {
+				threslim.col(index) = cells.col(loop).cast<double>();
+				++index;
+			}
+		}
+		logic = threslim.row(0);
+		occupied = (threslim.leftCols((logic.array() > -1).count()).array() + 0.5)*res;
+
+		/*Measured Angular Ranges around Vehicle*/
+		if (occupied.cols() > 0) {
+			vectors = occupied.colwise() - rnBN;
+			magnitude = vectors.colwise().hypotNorm();
+			for (int loop = 0; loop < vectors.cols(); loop++) {
+				radian = atan2(vectors(1, loop), vectors(0, loop));
+				radian = (radian <= 0) ? radian + 2 * M_PI : radian;
+				radian = (radian > 2 * M_PI) ? radian - 2 * M_PI : radian;
+				ang = (size_t)(std::round(radian*(180 / M_PI))-1);
+				ang = (ang >= 360) ? 359 : ang;
+				ang = (ang < 0) ? 0 : ang;
+				measure(ang, count) = (magnitude(loop) < measure(ang, count)) ? magnitude(loop) : measure(ang, count);
+			}
+		}
+	}
+
+	/*Place Ranges into Vectors*/
+	yobs = measure.col(0);
+	yobshat = measure.col(1);
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+void Mapping::LandVects(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd lndinfo, VectorXi lndcam) {
+
+	/*Memory Allocation*/
+	ylnd = VectorXd::Zero(1);
+	ylndhat = VectorXd::Zero(1);
+	if (lndinfo.rows() > 0) {  		
+		double centroid;
+		size_t markers = lndinfo.cols();
+		VectorXd rangey(markers), rangeyhat(markers);
+		VectorXd bearingy(markers), bearingyhat(markers);
+		MatrixXd rcPC(3, markers), diff(3, markers);
+		MatrixXd truevect(3, markers), landpose;
+		Vector3d rnPN;
+		
+		/*Parameter Initialisation*/
+		MatrixXd rcLC = lndinfo.topRows(3);
+		RowVectorXd thLC = lndinfo.row(3);
+		RowVectorXd id = lndinfo.row(4);
+
+		/*Determine Range and Bearing from Camera Measurements*/
+		for (int count = 0; count < markers; count++) {
+			centroid = landmarks(3, (size_t)id(count));
+			rcPC = rcLC.col(count)*(centroid/sin(thLC(count)));
+			rnPN = RnCN.middleCols(lndcam(count) * 3, 3)*rcPC + rnCN.col(lndcam(count));
+			diff.col(count) = rnPN - rnBN;
+			bearingy(count) = atan2(diff(1, count), diff(0, count));
+		}
+		bearingy = (bearingy.array() < 0).select(bearingy.array() + 2*M_PI, bearingy);
+		bearingy = (bearingy.array() >= 2*M_PI).select(bearingy.array() - 2 * M_PI, bearingy);
+		rangey = diff.colwise().hypotNorm();
+
+		/*Assumed True Measurements from NED Landmark Locations*/
+		landpose = landmarks.topRows(3);
+		for (int count = 0; count < markers; count++) {
+			truevect.col(count) = landpose.col((size_t)id(count)) - rnBN;
+			bearingyhat(count) = atan2(truevect(1, count), truevect(0, count));
+		}
+		bearingyhat = (bearingyhat.array() < 0).select(bearingyhat.array() + 2 * M_PI, bearingyhat);
+		bearingyhat = (bearingyhat.array() >= 2 * M_PI).select(bearingyhat.array() - 2 * M_PI, bearingyhat);
+		rangeyhat = truevect.colwise().hypotNorm();
+
+		/*Form Outputs*/
+		ylnd.resize(2 * markers); ylndhat.resize(2 * markers);
+		ylnd.topRows(markers) = rangey;
+		ylnd.bottomRows(markers) = bearingy;
+		ylndhat.topRows(markers) = rangeyhat;
+		ylndhat.bottomRows(markers) = bearingyhat;
+	}
 }
 
 /*--------------------------------------------------------------------------------------------------------------------------------------*/
@@ -164,100 +265,16 @@ MatrixXd Mapping::GetGrid(bool flag) {
 VectorXd Mapping::GetVect(bool flag) {
 
 	VectorXd output;
-	output = (flag) ? yhat : y;
+	if (flag) {
+		output.resize(yobshat.rows() + ylndhat.rows());
+		output.topRows(yobshat.rows()) = yobshat;
+		output.bottomRows(ylndhat.rows()) = ylndhat;		
+	}else {
+		output.resize(yobs.rows() + ylnd.rows());
+		output.topRows(yobs.rows()) = yobs;
+		output.bottomRows(ylnd.rows()) = ylnd;
+	}
 	return output;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*--------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-	//NOTE:: Camera Index now 0,1,2,3!!! NOT 1,2,3,4!! FIX!!
-
-void Mapping::MeasureLand(MatrixXd rnCN, MatrixXd RnCN, Vector3d rnBN, Matrix3d RnBN, MatrixXd LC, RowVectorXd camL, MatrixXd lmrks) {
-
-	/*********************************************************************************************************************/
-	/* Camera Observation */
-
-	if (LC.rows() > 1) {  // This condition assumes that LC will be initialised to a 1x1 matrix if there is no landmarks
-		MatrixXd rcLC = LC.topRows(3);
-		MatrixXd thLC = LC.bottomRows(1);
-		int lnd = rcLC.cols();
-		VectorXd bearingy(lnd),
-			bearingyhat(lnd),
-			rangey(lnd),
-			rangeyhat(lnd);
-		MatrixXd temp(3, 1);
-		temp << 2, 1, 0;
-		MatrixXd ind = 3 * camL.replicate(3, 1) - temp.replicate(1, lnd);
-		MatrixXd temp3 = thLC.array().sin();
-		MatrixXd temp2 = lmrks.row(3).array().cwiseQuotient(temp3.array());
-		MatrixXd rcPC(3, lnd);
-		rcPC = temp2.replicate(3, 1).cwiseProduct(rcLC);
-		MatrixXd rnPC = MatrixXd::Zero(3, lnd);
-		MatrixXd rnPN(3, lnd);
-
-		for (int count = 0; count < lnd; count++) {
-			rnPN.col(count) = RnCN.middleCols((camL(count) - 1) * 3, 3)*rcPC.col(count) + rnCN.col(camL(count) - 1);                 //.col(ind.col(count))*rcPC.col(count); // be careful with the use of count. Not sure the 0/1 starting difference issue is resovled in this line
-		}
-
-
-		MatrixXd diff = rnPN - rnBN.replicate(1, lnd);
-		for (int count = 0; count < lnd; count++) {
-			bearingy(count) = atan2(diff(1, count), diff(0, count));
-		}
-		rangey = diff.colwise().norm();
-
-		/**********************************************************************************************************************/
-		/* GPS and IMP Approximation with Assumed GPS Landmark Location */
-
-		MatrixXd local = RnBN*(lmrks.topRows(3) - rnBN.replicate(1, lnd));
-
-		for (int count = 0; count < lnd; count++) {
-			bearingy(count) = atan2(local(1, count), local(0, count));
-		}
-		rangeyhat = local.colwise().norm();
-
-
-		/**********************************************************************************************************************/
-		/* Form Outputs */
-		y.resize(lnd * 2);
-		yhat.resize(lnd * 2);
-		y << rangey, bearingy;
-		yhat << rangeyhat, bearingyhat;
-	}
-	else { // Using a 1 element array with a zero in it to indicate there was no observations
-		y.resize(1);
-		yhat.resize(1);
-		y << 0;
-		yhat << 0;
-	}
-}
